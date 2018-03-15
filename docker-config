@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+if [ -z "x$RELEASES" ]; then
+    echo "Providing default releases"
+    RELEASES=(latest cli fpm apache)
+fi
+RELEASE_NAME="roelofr/php-node"

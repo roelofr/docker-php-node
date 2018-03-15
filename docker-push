@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+source ./docker-config
+
+if [ "x$DOCKER_HUB_USER" = "x" -o "$DOCKER_HUB_PASS" = "x" ];
+then
+    echo "No login credentials for Docker Hub present"
+    exit 1
+fi
+
+set -e
+
+docker login --username "$DOCKER_HUB_USER" --password-stdin <<< "$DOCKER_HUB_PASS"
+docker push "$RELEASE_NAME"

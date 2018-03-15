@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+source ./docker-config
+
+if  ! which jq > /dev/null || \
+    ! which curl > /dev/null; then
+    echo 'Program requires `jq` and `curl` to be installed!'
+    echo 'Run `apt-get install -y jq curl` to continue.'
+    exit 1
+fi
+
+NODE_VERSION=$(curl \
+    --output - \
+    --header "Accept: application/vnd.github.v3+json" \
+    --header "User-Agent: 'Dockerfile updater (https://github.com/roelofr); curl'" \
+    https://api.github.com/repos/nodejs/node/releases \
+    | jq '.[] | .tag_name' -r \
+    | sort -r \
+    | head -n1 \
+    | sed -E 's/^v//'
+)
+
+YARN_VERSION=$(curl \
+    --output - \
+    --header "Accept: application/vnd.github.v3+json" \
+    --header "User-Agent: 'Dockerfile updater (https://github.com/roelofr); curl'" \
+    https://api.github.com/repos/yarnpkg/yarn/releases \
+    | jq '.[] | .tag_name' -r \
+    | sort -r \
+    | head -n1 \
+    | sed -E 's/^v//'
+)
+
+echo "Retrieved versions"
+echo "Node version: ${NODE_VERSION}"
+echo "Yarn version: ${YARN_VERSION}"
+
+for RELEASE in ${RELEASES[@]}
+do
+    echo "Conifguring release $RELEASE"
+    [ -d "$RELEASE" ] || mkdir $RELEASE
+    sed --regexp-extended \
+        -e "s#FROM roelofr/[a-z\:]+#FROM roelofr/php:$RELEASE#" \
+        -e "s/NODE_VERSION [0-9\.]+/NODE_VERSION ${NODE_VERSION}/" \
+        -e "s/YARN_VERSION [0-9\.]+/YARN_VERSION ${YARN_VERSION}/" \
+        ./Dockerfile.template \
+        > $RELEASE/Dockerfile
+done

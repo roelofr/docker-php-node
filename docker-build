@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+source ./docker-config
+
+for RELEASE in ${RELEASES[@]}
+do
+    if [ ! -d "$RELEASE/Dockerfile" ]; then
+        echo "Failed to find Dockerfile for $RELEASE."
+        exit 1
+    fi
+    echo "Building release $RELEASE"
+    docker build -t "$RELEASE_NAME:$RELEASE" "$RELEASE/"
+done
