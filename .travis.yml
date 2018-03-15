@@ -8,9 +8,11 @@ env:
   - RELEASES=fpm
   - RELEASES=apache
 
-install:
-  - apt-get update
-  - apt-get install -y curl jq
+addons:
+  apt:
+    packages:
+    - curl
+    - jq
 
 before_script:
   - ./docker-configure
