@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-if [ -z "x$RELEASES" ]; then
+if [ -z "$RELEASES" ]; then
     echo "Providing default releases"
     RELEASES=(latest cli fpm apache)
 fi
