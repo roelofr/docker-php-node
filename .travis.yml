@@ -1,0 +1,28 @@
+# vim: set et ts=2 sw=2 :
+language: bash
+services: docker
+
+env:
+  - RELEASES=latest
+  - RELEASES=cli
+  - RELEASES=fpm
+  - RELEASES=apache
+
+install:
+  - apt-get update
+  - apt-get install -y curl jq
+
+before_script:
+  - ./docker-configure
+
+script:
+  - ./docker-build
+
+after_script:
+  - docker images
+
+deploy:
+  provider: script
+  script: ./docker-push
+  on:
+    branch: master
