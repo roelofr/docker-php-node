@@ -5,3 +5,4 @@ if [ -z "$RELEASES" ]; then
     RELEASES=(latest cli fpm apache)
 fi
 RELEASE_NAME="roelofr/php-node"
+GITHUB_TOKEN=${GITHUB_TOKEN:-x}

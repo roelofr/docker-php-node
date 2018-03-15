@@ -3,46 +3,88 @@
 source ./docker-config
 
 if  ! which jq > /dev/null || \
-    ! which curl > /dev/null; then
-    echo 'Program requires `jq` and `curl` to be installed!'
-    echo 'Run `apt-get install -y jq curl` to continue.'
+    ! which curl > /dev/null || \
+    ! which tempfile > /dev/null; then
+    echo 'This program requires the `jq`, `curl` and `tempfile` programs to be installed!'
+    echo 'Run `apt-get install -y jq curl debianutils` to continue.'
     exit 1
 fi
 
-NODE_VERSION=$(curl \
-    --output - \
-    --header "Accept: application/vnd.github.v3+json" \
-    --header "User-Agent: 'Dockerfile updater (https://github.com/roelofr); curl'" \
-    https://api.github.com/repos/nodejs/node/releases \
-    | jq '.[] | .tag_name' -r \
-    | sort -r \
-    | head -n1 \
-    | sed -E 's/^v//'
-)
+function get_version() {
+    AUTH_HEADER=
+    if [ "${GITHUB_TOKEN:-x}" != "x" ]; then
+        echo "Pulling the GitHub API using API token"
+        AUTH_HEADER="Authorization: token ${GITHUB_TOKEN}"
+    else
+        echo "Pulling the GitHub API anonymously"
+        echo "This might crash"
+    fi
 
-YARN_VERSION=$(curl \
-    --output - \
-    --header "Accept: application/vnd.github.v3+json" \
-    --header "User-Agent: 'Dockerfile updater (https://github.com/roelofr); curl'" \
-    https://api.github.com/repos/yarnpkg/yarn/releases \
-    | jq '.[] | .tag_name' -r \
-    | sort -r \
-    | head -n1 \
-    | sed -E 's/^v//'
-)
+    URL="https://api.github.com/repos/$1/$2/releases"
+    FILE=$( tempfile )
+    curl \
+        --location \
+        --output "$FILE" \
+        --header "$AUTH_HEADER" \
+        --header "Accept: application/vnd.github.v3+json" \
+        --header "User-Agent: Dockerfile updater (https://github.com/roelofr); curl" \
+        --url "$URL"
 
-echo "Retrieved versions"
+    if [ "$?" -ne "0" -o ! -s "$FILE" ]; then
+        echo "Failed to download content from $URL."
+        echo "=== LOG CONTENT BEGIN ==="
+        head -n20 "$FILE"
+        echo "===  LOG CONTENT END  ==="
+        return 1
+    fi
+
+    VERSION="$(jq -r '. | sort_by(.tag_name) | last | .tag_name | ltrimstr("v")' "$FILE" 2>/dev/null)"
+    if [ $? -ne 0 ]; then
+        echo "Failed to parse content from $URL."
+        echo "=== LOG CONTENT BEGIN ==="
+        head -n20 "$FILE"
+        echo "===  LOG CONTENT END  ==="
+    fi
+    VERSION=${VERSION[0]}
+    return 0
+}
+
+# Get node version
+get_version nodejs node
+NODE_VERSION="$VERSION"
+
+# Get Yarn version
+get_version yarnpkg yarn
+YARN_VERSION="$VERSION"
+
+echo "RETRIEVED VERSIONS"
+echo -ne "\n"
 echo "Node version: ${NODE_VERSION}"
 echo "Yarn version: ${YARN_VERSION}"
+echo -ne "\n"
 
-for RELEASE in ${RELEASES[@]}
-do
-    echo "Conifguring release $RELEASE"
-    [ -d "$RELEASE" ] || mkdir $RELEASE
+if [ -z "${NODE_VERSION}" -o -z "${YARN_VERSION}" ];
+then
+    echo "Node or Yarn version empty."
+    echo "Aborting build"
+    exit 1
+fi
+
+echo "<Configuration>"
+
+for RELEASE in ${RELEASES[@]}; do
+    echo "  | Configuring release \"$RELEASE\""
+    if [ ! -d "$RELEASE" ]; then
+        echo "  |––– dir  $RELEASE"
+        mkdir $RELEASE
+    fi
+
+    echo "  |––– file $RELEASE/Dockerfile"
     sed --regexp-extended \
-        -e "s#FROM roelofr/[a-z\:]+#FROM roelofr/php:$RELEASE#" \
+        -e "s#FROM roelofr/[a-z\:]+#FROM roelofr/php:${RELEASE}#" \
         -e "s/NODE_VERSION [0-9\.]+/NODE_VERSION ${NODE_VERSION}/" \
         -e "s/YARN_VERSION [0-9\.]+/YARN_VERSION ${YARN_VERSION}/" \
         ./Dockerfile.template \
         > $RELEASE/Dockerfile
+    echo "  |–––      $( stat --printf="%s" "$RELEASE/Dockerfile" ) bytes"
 done
