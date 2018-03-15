@@ -10,5 +10,5 @@ fi
 
 set -e
 
-docker login --username "$DOCKER_HUB_USER" --password-stdin <<< "$DOCKER_HUB_PASS"
+docker login --username "$DOCKER_HUB_USER" --password "$DOCKER_HUB_PASS"
 docker push "$RELEASE_NAME"
